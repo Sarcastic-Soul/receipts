@@ -1,0 +1,17 @@
+node_modules
+dist
+.vercel
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Private planning notes and scraped hackathon pages (kept local only)
+raw/
+competitors.md
+IDEA.md
+PLAN.md
+HACKATHON.md
+CLAUDE.md
+docs/samples/
