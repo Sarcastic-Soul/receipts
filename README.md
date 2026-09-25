@@ -2,7 +2,7 @@
 
 **Fact-check any crypto post with live CoinMarketCap data.** Paste an X post link, the post's text, a `$TICKER` or a contract address. Receipts pulls out every claim the post makes ("up 300% this week", "low cap gem", "listed on Binance", "volume exploding") and checks each one against the CoinMarketCap API. Every verdict shows the exact CMC request and response behind it: the receipts.
 
-- **Live site:** _TBD_
+- **Live site:** https://receipts-orpin-eight.vercel.app
 - **Demo video:** _TBD_
 - **Track:** AI Agents and Automation
 - Built for [Build with CMC: API Hackathon](https://dorahacks.io/hackathon/coinmarketcap-api-202609/detail) on DoraHacks.
@@ -34,12 +34,51 @@ A post is free text. Before any API call you have to work out which coins it mea
 | `GET /v2/cryptocurrency/market-pairs/latest?id=` | "Listed on X" claims, share of volume on one exchange |
 | `GET /v1/global-metrics/quotes/latest` | "Whole market is pumping" claims, market context line |
 | `GET /v1/cryptocurrency/trending/latest` | "Trending" claims |
-| `GET /v1/cryptocurrency/listings/historical` | Base-rate line on the card ("coins at this rank were still top 500 a year later X% of the time"). Precomputed once by [`scripts/base-rates.ts`](scripts/base-rates.ts), not called live |
+| `GET /v1/cryptocurrency/listings/historical` | Base-rate line on the card ("coins ranked #101–200 were still in the top 200 six months later 72% of the time"). 12 monthly snapshots of the top 1000, precomputed once by [`scripts/base-rates.ts`](scripts/base-rates.ts) into [`lib/baseRatesData.ts`](lib/baseRatesData.ts), never called live |
 | `GET /v1/key/info` | Plan and credit check (`/api/status`, `bun run probe`) |
 
 ### A real request and response
 
-_Filled in from [`docs/samples/`](docs/samples/) after running `bun run probe` with a real key._
+The coin card and most checks come from one batched quotes call. This is a real call from the build (trimmed to the fields Receipts reads; the full response for every call is shown in the app's receipts panel):
+
+```sh
+curl -H "X-CMC_PRO_API_KEY: $CMC_API_KEY" \
+  "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=1,24478&convert=USD"
+```
+
+```json
+{
+  "status": { "timestamp": "2026-09-25T16:28:35.112Z", "error_code": 0, "credit_count": 1 },
+  "data": {
+    "24478": {
+      "id": 24478,
+      "name": "Pepe",
+      "symbol": "PEPE",
+      "cmc_rank": 46,
+      "num_market_pairs": 716,
+      "date_added": "2023-04-17T06:18:08.000Z",
+      "max_supply": 413772355107943.94,
+      "circulating_supply": 413772355107943.94,
+      "self_reported_market_cap": null,
+      "quote": {
+        "USD": {
+          "price": 0.000004453436380606,
+          "volume_24h": 375430472.43,
+          "volume_change_24h": -10.6523,
+          "percent_change_24h": -0.37497057,
+          "percent_change_7d": 16.62001192,
+          "percent_change_90d": 82.25627034,
+          "market_cap": 1842708859.53,
+          "fully_diluted_market_cap": 1842708859.53,
+          "last_updated": "2026-09-25T16:27:03.000Z"
+        }
+      }
+    }
+  }
+}
+```
+
+From this one response, a post saying "$PEPE is up 300% this week and still a low cap gem, volume exploding" gets three verdicts: **False** (+16.6% over 7d), **False** ($1.84B market cap, rank #46) and **False** (volume down 11% in 24h).
 
 ## How it's built
 
@@ -75,7 +114,7 @@ bun install
 cp .env.example .env      # add CMC_API_KEY (required), GEMINI_API_KEY (optional)
 bun run dev:api           # API on :3001
 bun run dev               # site on :5173 (proxies /api)
-bun run test              # 34 tests, no keys needed
+bun run test              # 38 tests, no keys needed
 bun run probe             # which CMC endpoints your key can use
 ```
 
@@ -83,7 +122,20 @@ Without Redis env vars, results are kept in memory. Without a Gemini key, the ru
 
 ## What the CMC API made possible, and where it got in the way
 
-_To be written from real use during the build._
+**Made possible**
+
+- `/v1/cryptocurrency/map?symbol=` returns *every* coin with a ticker, with rank. That one call is the whole "ticker impostors" feature: `$TRUMP` matches 60 coins on CMC, and a shill post never says which one it means.
+- `/v2/cryptocurrency/info?address=` turns a pasted contract address into a coin with no extra lookup service.
+- `quotes/latest` is very rich for 1 credit: 1h to 90d changes, `volume_change_24h`, `num_market_pairs`, `date_added`, FDV, and `self_reported_market_cap`. Most claim types ("up 300% this week", "low cap", "volume exploding", "just launched", "fixed supply") and most red flags come from this single batched call.
+- Clear error codes (`1006` "plan doesn't support this endpoint") let the app show a clean "needs plan" verdict instead of breaking.
+
+**Got in the way**
+
+- `/v2/cryptocurrency/market-pairs/latest` and `/v1/cryptocurrency/trending/latest` returned `403` / `1006` on our key during the event. "Listed on Binance" is one of the most common shill claims, and it's the one we could not check. The app marks those claims "needs plan".
+- `listings/historical` only reaches back 12 months on our plan, so the base-rate stat uses "six months later" inside that window instead of a longer history.
+- `ohlcv/historical` returned `403`, so "down 90% from its peak" can't be checked from all-time highs.
+- `map?symbol=` has no quote data, so picking the "real" coin among impostors uses the map's `rank` field; unranked copycats all tie.
+- The free plan drops back to Basic when judging starts, so everything historical had to be precomputed, and every live response is cached with a 30-day stale copy so the site keeps working if calls are rate-limited.
 
 ## License
 
