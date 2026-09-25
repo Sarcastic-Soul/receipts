@@ -118,3 +118,18 @@ describe("red flags", () => {
     expect(coin(quotePepe).card.redFlags.filter((f) => f.severity === "high")).toEqual([]);
   });
 });
+
+describe("market_wide", () => {
+  const global = (change: number) =>
+    ({ ok: true, receiptId: "r7", needsPlan: false, status: 200, data: { btc_dominance: 57, quote: { USD: { total_market_cap: 3.9e12, total_market_cap_yesterday_percentage_change: change } } } }) as CheckContext["global"];
+  const claim = { quote: "whole market is pumping", kind: "market_wide" as const, direction: "up" as const };
+  it("a flat day is misleading, not true", () => {
+    expect(check(claim, { ...ctx(), global: global(0.04) }).verdict).toBe("misleading");
+  });
+  it("a real move is true", () => {
+    expect(check(claim, { ...ctx(), global: global(3.2) }).verdict).toBe("true");
+  });
+  it("wrong direction is false", () => {
+    expect(check(claim, { ...ctx(), global: global(-2) }).verdict).toBe("false");
+  });
+});

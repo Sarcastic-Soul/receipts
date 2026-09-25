@@ -11,6 +11,8 @@ import type { Claim } from "./schema.js";
 export const LOW_CAP_USD = 100_000_000;
 /** "Volume exploding" is true when 24h volume grew at least this much. */
 export const VOLUME_SPIKE_PCT = 50;
+/** Whole-market moves smaller than this (in a day) count as flat. */
+export const MARKET_MOVE_PCT = 1;
 
 export interface CoinData {
   card: CoinCard;
@@ -308,6 +310,13 @@ export function checkMarketWide(claim: Claim, ctx: CheckContext): Outcome {
   ];
   if (!claim.direction) return { verdict: "unverifiable", summary: `Total market cap is ${pct(change)} vs yesterday.`, evidence };
   const ok = claim.direction === "up" ? change > 0 : change < 0;
+  if (ok && Math.abs(change) < MARKET_MOVE_PCT) {
+    return {
+      verdict: "misleading",
+      summary: `The whole crypto market is only ${pct(change)} vs yesterday. That's flat, not a big move.`,
+      evidence,
+    };
+  }
   return {
     verdict: ok ? "true" : "false",
     summary: `The whole crypto market is ${pct(change)} vs yesterday.`,

@@ -52,7 +52,8 @@ export function buildCard(c: CardInput): CoinCard {
     matchedBy: c.matchedBy,
     query: c.query,
     redFlags: [],
-    impostors: c.impostors.map(toImpostor),
+    // Ranked coins first, best rank first.
+    impostors: c.impostors.map(toImpostor).sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)),
     baseRate: null,
     receiptIds: [c.mapReceiptId, c.infoReceiptId, c.quoteReceiptId, c.pairsReceiptId].filter((x): x is string => !!x),
   };

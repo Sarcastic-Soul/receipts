@@ -94,7 +94,7 @@ export async function runCheck(raw: string, deps: CheckDeps = {}): Promise<Check
   ]);
 
   if (quotes && !quotes.ok) notes.push(`Live quotes failed: ${quotes.errorMessage ?? "unknown error"}.`);
-  if (pairs.some((p) => p.needsPlan)) {
+  if (pairs.some((p) => p.needsPlan) && extraction.claims.some((c) => c.kind === "listed_on_exchange")) {
     notes.push("Market pairs (exchange listings) aren't on the current CMC API plan, so exchange checks are skipped.");
   }
 
