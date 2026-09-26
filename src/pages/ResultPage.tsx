@@ -40,7 +40,7 @@ export function ResultPage({ id, initial }: { id: string; initial: CheckResult |
       </div>
     );
   }
-  if (!result) return <p className="animate-pulse font-mono text-sm text-muted">🧾 Loading receipt…</p>;
+  if (!result) return <p className="animate-pulse font-mono text-sm text-muted">Loading receipt…</p>;
 
   return (
     <ReceiptsContext.Provider value={{ open }}>
@@ -60,14 +60,14 @@ export function ResultPage({ id, initial }: { id: string; initial: CheckResult |
             </div>
             {result.market && (
               <p className="mt-5 font-mono text-xs text-muted">
-                🌍 Whole crypto market: {usd(result.market.totalMarketCap)} total cap,{" "}
+                Whole crypto market: {usd(result.market.totalMarketCap)} total cap,{" "}
                 {pct(result.market.totalMarketCapChange24h)} vs yesterday.
                 <ReceiptChip id={result.market.receiptId} />
               </p>
             )}
             {result.unresolved.length > 0 && (
               <p className="mt-3 rounded-md border-l-4 border-bad bg-white/50 px-3 py-2 text-sm">
-                🚫 Not found on CoinMarketCap: {result.unresolved.map((u) => (u.length > 14 ? `${u.slice(0, 6)}…${u.slice(-4)}` : `$${u}`)).join(", ")}.
+                Not found on CoinMarketCap: {result.unresolved.map((u) => (u.length > 14 ? `${u.slice(0, 6)}…${u.slice(-4)}` : `$${u}`)).join(", ")}.
                 A coin CMC doesn't track has no public market data to back up any claim.
               </p>
             )}
@@ -87,7 +87,7 @@ export function ResultPage({ id, initial }: { id: string; initial: CheckResult |
         </section>
 
         <section className="space-y-4">
-          <h2 className="font-mono text-xs uppercase tracking-widest text-muted">🪙 Coin{result.coins.length === 1 ? "" : "s"}</h2>
+          <h2 className="font-mono text-xs uppercase tracking-widest text-muted">Coin{result.coins.length === 1 ? "" : "s"}</h2>
           {result.coins.map((c) => (
             <CoinCardView key={c.id} card={c} />
           ))}
@@ -118,7 +118,7 @@ function SourcePost({ result }: { result: CheckResult }) {
   return (
     <div>
       <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-muted">
-        {input.kind === "tweet" ? "𝕏 Post on X" : input.kind === "text" ? "Post" : input.kind === "ticker" ? "Ticker" : "Contract address"} ·
+        {input.kind === "tweet" ? "Post on X" : input.kind === "text" ? "Post" : input.kind === "ticker" ? "Ticker" : "Contract address"} ·
         checked {new Date(result.createdAt).toUTCString().replace(" GMT", " UTC")}
       </p>
       <blockquote className="whitespace-pre-wrap break-words border-l-2 border-ink/20 pl-3 text-base leading-snug sm:text-lg">{input.text}</blockquote>
@@ -162,8 +162,9 @@ function Tally({ result }: { result: CheckResult }) {
           </div>
           <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs">
             {shown.map((v) => (
-              <span key={v} className="whitespace-nowrap">
-                {VERDICT_STYLE[v].emoji} {counts.get(v)} {VERDICT_STYLE[v].label.toLowerCase()}
+              <span key={v} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                <span className={`h-2 w-2 rounded-full ${VERDICT_STYLE[v].className}`} />
+                {counts.get(v)} {VERDICT_STYLE[v].label.toLowerCase()}
               </span>
             ))}
           </p>

@@ -132,20 +132,17 @@ export function Home({ onResult }: { onResult: (r: CheckResult) => void }) {
 
 function HowItWorks() {
   const steps = [
-    ["📥", "Read", "Tweet links are read with X's public oEmbed. Text, tickers and addresses work directly."],
-    ["🧠", "Extract", "An LLM lists the coins and every checkable claim in the post. It never produces numbers."],
-    ["🔍", "Check", "Plain code checks each claim against CoinMarketCap: quotes, ranks, volume, supply, sector rankings and exchange wallets."],
-    ["🧾", "Receipts", "Every verdict links to the exact CMC request and response it came from."],
+    ["Read", "Tweet links are read with X's public oEmbed. Text, tickers and addresses work directly."],
+    ["Extract", "An LLM lists the coins and every checkable claim in the post. It never produces numbers."],
+    ["Check", "Plain code checks each claim against CoinMarketCap: quotes, ranks, volume, supply, sector rankings and exchange wallets."],
+    ["Receipts", "Every verdict links to the exact CMC request and response it came from."],
   ];
   return (
     <section className="mt-10">
       <h2 className="mb-3 font-mono text-xs uppercase tracking-widest text-muted">How it works</h2>
       <ol className="grid gap-3 sm:grid-cols-2">
-        {steps.map(([emoji, title, text], i) => (
-          <li key={title} className="flex gap-3 rounded-md bg-paper p-4">
-            <span className="text-xl" aria-hidden>
-              {emoji}
-            </span>
+        {steps.map(([title, text], i) => (
+          <li key={title} className="rounded-md bg-paper p-4">
             <div>
               <p>
                 <span className="font-mono text-xs text-muted">0{i + 1}</span>

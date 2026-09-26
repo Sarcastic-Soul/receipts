@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink, Flag, Info } from "lucide-react";
 import { useState } from "react";
 import { count, pct, usd } from "../../lib/format";
 import type { CoinCard, RedFlag } from "../../lib/types";
@@ -65,7 +65,7 @@ export function CoinCardView({ card }: { card: CoinCard }) {
         <ul className="mt-4 space-y-1.5">
           {card.redFlags.map((f) => (
             <li key={f.id} className={`flex items-start gap-2 rounded-md border-l-4 bg-white/50 px-3 py-2 text-sm ${FLAG_STYLE[f.severity]}`}>
-              <span aria-hidden>{f.severity === "info" ? "ℹ️" : f.severity === "high" ? "🚩" : "⚠️"}</span>
+              {f.severity === "info" ? <Info size={16} className="mt-0.5 shrink-0" /> : <Flag size={16} className="mt-0.5 shrink-0" />}
               <span className="flex-1 text-ink">{f.text}</span>
               <ReceiptChip id={f.receiptId} />
             </li>
@@ -82,7 +82,7 @@ export function CoinCardView({ card }: { card: CoinCard }) {
             aria-expanded={showImpostors}
             className="inline-flex items-center gap-1 font-mono text-xs underline"
           >
-            🎭 {showImpostors ? "Hide" : "Show"} the {card.impostors.length} other ${card.symbol} coin{card.impostors.length === 1 ? "" : "s"}
+            {showImpostors ? "Hide" : "Show"} the {card.impostors.length} other ${card.symbol} coin{card.impostors.length === 1 ? "" : "s"}
             <ChevronDown size={14} className={`transition-transform ${showImpostors ? "rotate-180" : ""}`} />
           </button>
           {showImpostors && (
