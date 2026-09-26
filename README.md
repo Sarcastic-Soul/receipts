@@ -3,7 +3,9 @@
 **Fact-check any crypto post with live CoinMarketCap data.** Paste an X post link, the post's text, a `$TICKER` or a contract address. Receipts pulls out every claim the post makes ("up 300% this week", "low cap gem", "listed on Binance", "#1 AI coin", "volume exploding") and checks each one against the CoinMarketCap API. Every verdict shows the exact CMC request and response behind it: the receipts.
 
 - **Live site:** https://receipts-orpin-eight.vercel.app
-- **Demo video:** _TBD_
+- **Demo video:** https://youtu.be/YfdCPgLGxBw
+- **BUIDL page:** https://dorahacks.io/buidl/49157
+- **X post:** https://x.com/Anish_Is_Busy/status/2103857282866114888
 - **Track:** AI Agents and Automation
 - Built for [Build with CMC: API Hackathon](https://dorahacks.io/hackathon/coinmarketcap-api-202609/detail) on DoraHacks.
 
@@ -149,3 +151,9 @@ Without Redis env vars, results are kept in memory. Without a Gemini key, the ru
 ## License
 
 MIT
+
+## Credits
+
+Demo video music: "Wallpaper" by Kevin MacLeod (incompetech.com)  
+Licensed under Creative Commons: By Attribution 4.0  
+http://creativecommons.org/licenses/by/4.0/
