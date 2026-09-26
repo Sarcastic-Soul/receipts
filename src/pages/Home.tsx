@@ -44,9 +44,6 @@ export function Home({ onResult }: { onResult: (r: CheckResult) => void }) {
 
   return (
     <main>
-      <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-3 py-1 font-mono text-[11px] text-muted">
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-good" /> Live CoinMarketCap data · every number has a receipt
-      </p>
       <h1 className="mb-3 text-[1.9rem] font-bold leading-[1.1] tracking-tight sm:text-5xl">
         Someone's shilling a coin.
         <br />
