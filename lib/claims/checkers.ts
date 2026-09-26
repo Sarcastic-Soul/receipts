@@ -1,7 +1,8 @@
 import type { CmcResult } from "../cmc/client.js";
-import type { GlobalMetrics, MarketPairs } from "../cmc/endpoints.js";
-import { daysSince, pct, usd } from "../format.js";
+import type { Category, CategoryDetail, Exchange, ExchangeHolding, GlobalMetrics, MarketPairs } from "../cmc/endpoints.js";
+import { count, daysSince, pct, usd } from "../format.js";
 import type { ClaimResult, CoinCard, Evidence, Verdict } from "../types.js";
+import { normalize } from "./lookup.js";
 import type { Claim } from "./schema.js";
 
 // Deterministic claim checkers. The LLM only says *what* was claimed; every verdict
@@ -13,6 +14,8 @@ export const LOW_CAP_USD = 100_000_000;
 export const VOLUME_SPIKE_PCT = 50;
 /** Whole-market moves smaller than this (in a day) count as flat. */
 export const MARKET_MOVE_PCT = 1;
+/** Default N when a post says "a top AI coin" with no number. */
+export const CATEGORY_TOP_DEFAULT = 10;
 
 export interface CoinData {
   card: CoinCard;
@@ -27,8 +30,25 @@ export interface CheckContext {
   primary: CoinData | null;
   global?: CmcResult<GlobalMetrics>;
   trending?: CmcResult<Array<{ id: number; symbol: string; name: string }>>;
+  /** Keyed by normalize(exchange name as written in the post). */
+  exchanges?: Map<string, ExchangeLookup>;
+  /** Keyed by normalize(category as written in the post). */
+  categories?: Map<string, CategoryLookup>;
   unresolved: string[];
   now?: number;
+}
+
+/** Fallback for exchange claims when market pairs are off our plan: the exchange's own wallets. */
+export interface ExchangeLookup {
+  map: CmcResult<Exchange[]>;
+  exchange: Exchange | null;
+  assets?: CmcResult<ExchangeHolding[]>;
+}
+
+export interface CategoryLookup {
+  list: CmcResult<Category[]>;
+  category: Category | null;
+  detail?: CmcResult<CategoryDetail>;
 }
 
 type Outcome = Pick<ClaimResult, "verdict" | "summary" | "evidence">;
@@ -75,7 +95,9 @@ function runChecker(claim: Claim, ctx: CheckContext): Outcome {
     case "volume_spike":
       return checkVolume(coin);
     case "listed_on_exchange":
-      return checkExchange(claim, coin);
+      return checkExchange(claim, coin, ctx.exchanges?.get(normalize(claim.exchange ?? "")));
+    case "category_rank":
+      return checkCategory(claim, coin, ctx.categories?.get(normalize(claim.category ?? "")));
     case "new_listing":
       return checkNewListing(coin, ctx.now);
     case "fixed_supply":
@@ -218,11 +240,12 @@ export function checkVolume(coin: CoinData): Outcome {
   return { verdict, summary, evidence };
 }
 
-export function checkExchange(claim: Claim, coin: CoinData): Outcome {
+export function checkExchange(claim: Claim, coin: CoinData, reserves?: ExchangeLookup): Outcome {
   const { card } = coin;
   const want = (claim.exchange ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const res = coin.pairs;
   if (!want) return { verdict: "unverifiable", summary: "No exchange named.", evidence: [] };
+  if ((!res || !res.ok || !res.data) && reserves?.map.ok) return checkExchangeReserves(claim, coin, reserves);
   if (!res || !res.ok || !res.data) {
     return {
       verdict: res?.needsPlan ? "needs_plan" : "unverifiable",
@@ -253,6 +276,105 @@ export function checkExchange(claim: Claim, coin: CoinData): Outcome {
     summary: covered
       ? `No ${claim.exchange} pairs among all ${pairs.length} market pairs CMC lists for $${card.symbol}.`
       : `No ${claim.exchange} pairs in the top ${pairs.length} pairs by volume on CMC, so any listing there is tiny.`,
+    evidence,
+  };
+}
+
+/**
+ * Market pairs are the direct proof of a listing. Without them, CMC's copy of the
+ * exchange's wallet holdings is the next best thing: exchanges hold the coins their
+ * users deposit and trade. Holding it is strong evidence; not holding it proves nothing.
+ */
+export function checkExchangeReserves(claim: Claim, coin: CoinData, lookup: ExchangeLookup): Outcome {
+  const { card } = coin;
+  const ex = lookup.exchange;
+  if (!ex) {
+    return {
+      verdict: "unverifiable",
+      summary: `CMC has no exchange called "${claim.exchange}".`,
+      evidence: [ev("Exchange lookup", "no match", lookup.map.receiptId)],
+    };
+  }
+  const evidence = [ev("Exchange on CMC", ex.name, lookup.map.receiptId)];
+  const assets = lookup.assets;
+  if (!assets || !assets.ok || !assets.data) {
+    return {
+      verdict: assets?.needsPlan ? "needs_plan" : "unverifiable",
+      summary: `Couldn't load ${ex.name}'s wallet holdings from CMC${assets?.errorMessage ? ` (${assets.errorMessage})` : ""}.`,
+      evidence: assets ? [...evidence, ev("Request", "exchange/assets failed", assets.receiptId)] : evidence,
+    };
+  }
+  if (!assets.data.length) {
+    return {
+      verdict: "unverifiable",
+      summary: `CMC has no wallet data for ${ex.name}, and exchange listings (market pairs) aren't on our API plan.`,
+      evidence: [...evidence, ev("Wallet data", "none", assets.receiptId)],
+    };
+  }
+  const held = assets.data.find((h) => h.crypto_id === card.id);
+  evidence.push(ev(`Coins in ${ex.name}'s wallets`, String(assets.data.length), assets.receiptId));
+  if (held) {
+    const worth = held.usd !== null ? ` (about ${usd(held.usd)})` : "";
+    evidence.push(ev(`${ex.name} holds`, `${count(held.balance)} ${card.symbol}${worth}`, assets.receiptId));
+    return {
+      verdict: "true",
+      summary: `${ex.name}'s wallets hold ${count(held.balance)} $${card.symbol}${worth}. Exchanges hold the coins they list, so this checks out.`,
+      evidence,
+    };
+  }
+  return {
+    verdict: "unverifiable",
+    summary: `$${card.symbol} isn't among the ${assets.data.length} coins in ${ex.name}'s wallets that CMC tracks. That hints it isn't listed there, but it isn't proof.`,
+    evidence,
+  };
+}
+
+export function checkCategory(claim: Claim, coin: CoinData, lookup?: CategoryLookup): Outcome {
+  const { card } = coin;
+  if (!claim.category || !lookup) return { verdict: "unverifiable", summary: "No sector named.", evidence: [] };
+  if (!lookup.list.ok) {
+    return { verdict: "unverifiable", summary: "Couldn't load CMC's category list.", evidence: [ev("Request", "categories failed", lookup.list.receiptId)] };
+  }
+  const cat = lookup.category;
+  if (!cat) {
+    return {
+      verdict: "unverifiable",
+      summary: `CMC has no category matching "${claim.category}".`,
+      evidence: [ev("Category lookup", "no match", lookup.list.receiptId)],
+    };
+  }
+  const detail = lookup.detail;
+  if (!detail?.ok || !detail.data) {
+    return { verdict: "unverifiable", summary: `Couldn't load the ${cat.name} category from CMC.`, evidence: detail ? [ev("Request", "category failed", detail.receiptId)] : [] };
+  }
+  const limit = claim.rankLimit ?? CATEGORY_TOP_DEFAULT;
+  const defNote = claim.rankLimit === null ? ` (read as top ${CATEGORY_TOP_DEFAULT})` : "";
+  const coins = detail.data.coins;
+  const leader = coins[0];
+  const evidence = [ev("CMC category", `${cat.name} (${cat.num_tokens ?? coins.length} coins)`, lookup.list.receiptId)];
+  if (leader) evidence.push(ev(`#1 in ${cat.name}`, `$${leader.symbol} (${usd(leader.market_cap)})`, detail.receiptId));
+
+  const idx = coins.findIndex((c) => c.id === card.id);
+  if (idx >= 0) {
+    const pos = idx + 1;
+    evidence.push(ev(`$${card.symbol} in ${cat.name}`, `#${pos}`, detail.receiptId));
+    const ok = pos <= limit;
+    const where = limit === 1 ? (ok ? "the top spot" : "not the top spot") : `${ok ? "inside" : "outside"} the top ${limit}${defNote}`;
+    const vsLeader = !ok && leader ? ` #1 is $${leader.symbol}.` : "";
+    return {
+      verdict: ok ? "true" : "false",
+      summary: `$${card.symbol} is #${pos} in CMC's ${cat.name} category by rank, ${where}.${vsLeader}`,
+      evidence,
+    };
+  }
+  // Not in the top 100 of the category. If the coin outranks the 100th coin, it isn't in the category at all.
+  const last = coins[coins.length - 1]?.cmc_rank ?? null;
+  const notTagged = coins.length < 100 || (card.rank !== null && last !== null && card.rank < last);
+  return {
+    verdict: "false",
+    summary: notTagged
+      ? `CMC doesn't list $${card.symbol} in its ${cat.name} category at all.`
+      : `$${card.symbol} isn't even in the top ${coins.length} of CMC's ${cat.name} category.`,
     evidence,
   };
 }

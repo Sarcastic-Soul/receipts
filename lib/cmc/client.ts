@@ -48,6 +48,8 @@ export class CmcSession {
     params: Record<string, string>,
     ttlSeconds: number,
     pick?: (data: unknown) => unknown,
+    /** Cut a big response down to the fields we use before it is cached. */
+    shape?: (data: unknown) => unknown,
   ): Promise<CmcResult<T>> {
     const query = new URLSearchParams(Object.entries(params).sort(([a], [b]) => a.localeCompare(b)));
     const cacheKey = `cmc:${endpoint}?${query}`;
@@ -93,7 +95,7 @@ export class CmcSession {
 
     const errorCode = Number(json.status?.error_code ?? 0);
     if (status === 200 && errorCode === 0) {
-      const fresh: CachedBody = { body: { data: json.data, status: { credit_count: json.status?.credit_count } }, fetchedAt: new Date().toISOString() };
+      const fresh: CachedBody = { body: { data: shape ? shape(json.data) : json.data, status: { credit_count: json.status?.credit_count } }, fetchedAt: new Date().toISOString() };
       try {
         await store.set(cacheKey, fresh, STALE_KEEP_SECONDS);
       } catch {

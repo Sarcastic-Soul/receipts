@@ -183,3 +183,86 @@ export async function trendingLatest(cmc: CmcSession) {
   );
   return parse(res, Trending);
 }
+
+export const Exchange = z.looseObject({ id: z.number(), name: z.string(), slug: z.string() });
+export type Exchange = z.infer<typeof Exchange>;
+
+/** Every active exchange on CMC, cut to id, name and slug (the full list is ~200 KB). */
+export async function exchangeMap(cmc: CmcSession, pick?: (data: unknown) => unknown) {
+  const res = await cmc.get("/v1/exchange/map", {}, DAY, pick, (data) =>
+    (data as Exchange[]).map(({ id, name, slug }) => ({ id, name, slug })),
+  );
+  return parse(res, z.array(Exchange));
+}
+
+export const ExchangeHolding = z.object({
+  crypto_id: z.number(),
+  symbol: z.string(),
+  balance: z.number(),
+  usd: z.number().nullable(),
+});
+export type ExchangeHolding = z.infer<typeof ExchangeHolding>;
+
+/**
+ * Coins held in an exchange's wallets that CMC tracks (proof-of-reserves data).
+ * Rows are summed per coin across chains and wallets.
+ */
+export async function exchangeAssets(cmc: CmcSession, exchangeId: number, pick?: (data: unknown) => unknown) {
+  const res = await cmc.get("/v1/exchange/assets", { id: String(exchangeId) }, 60 * 60 * 6, pick, (data) => {
+    const rows = data as Array<{ balance?: number; currency?: { crypto_id?: number; symbol?: string; price_usd?: number } }>;
+    const byCoin = new Map<number, ExchangeHolding>();
+    for (const r of rows ?? []) {
+      const id = r.currency?.crypto_id;
+      if (id === undefined || typeof r.balance !== "number") continue;
+      const h = byCoin.get(id) ?? { crypto_id: id, symbol: r.currency?.symbol ?? "?", balance: 0, usd: null };
+      h.balance += r.balance;
+      if (typeof r.currency?.price_usd === "number") h.usd = h.balance * r.currency.price_usd;
+      byCoin.set(id, h);
+    }
+    return [...byCoin.values()].sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0));
+  });
+  return parse(res, z.array(ExchangeHolding));
+}
+
+export const Category = z.object({
+  id: z.string(),
+  name: z.string(),
+  num_tokens: num,
+  market_cap: num,
+});
+export type Category = z.infer<typeof Category>;
+
+/** Every CMC category ("Memes", "AI & Big Data", "Layer 1"...), without descriptions. */
+export async function categories(cmc: CmcSession, pick?: (data: unknown) => unknown) {
+  const res = await cmc.get("/v1/cryptocurrency/categories", {}, DAY, pick, (data) =>
+    (data as Category[]).map(({ id, name, num_tokens, market_cap }) => ({ id, name, num_tokens, market_cap })),
+  );
+  return parse(res, z.array(Category));
+}
+
+export const CategoryCoin = z.object({
+  id: z.number(),
+  symbol: z.string(),
+  name: z.string(),
+  cmc_rank: num,
+  market_cap: num,
+});
+export type CategoryCoin = z.infer<typeof CategoryCoin>;
+
+export const CategoryDetail = Category.extend({ coins: z.array(CategoryCoin) });
+export type CategoryDetail = z.infer<typeof CategoryDetail>;
+
+/** The top 100 coins in one category, ordered by CMC rank. */
+export async function categoryCoins(cmc: CmcSession, id: string, pick?: (data: unknown) => unknown) {
+  const res = await cmc.get("/v1/cryptocurrency/category", { id, limit: "100", convert: "USD" }, 60 * 60, pick, (data) => {
+    const d = data as Category & { coins?: Array<{ id: number; symbol: string; name: string; cmc_rank?: number; quote?: { USD?: { market_cap?: number } } }> };
+    return {
+      id: d.id,
+      name: d.name,
+      num_tokens: d.num_tokens,
+      market_cap: d.market_cap,
+      coins: (d.coins ?? []).map((c) => ({ id: c.id, symbol: c.symbol, name: c.name, cmc_rank: c.cmc_rank ?? null, market_cap: c.quote?.USD?.market_cap ?? null })),
+    };
+  });
+  return parse(res, CategoryDetail);
+}

@@ -11,6 +11,8 @@ const PERIOD_WORDS: Array<[RegExp, Claim["period"]]> = [
   [/\b(month|30d|30 days)\b/i, "30d"],
 ];
 
+const SECTORS = "ai|meme|memecoin|defi|layer[\\s-]?[12]|l[12]|rwa|gaming|gamefi|depin|privacy";
+
 const EXCHANGES = ["binance", "coinbase", "kraken", "okx", "bybit", "kucoin", "gate", "bitget", "mexc", "htx", "upbit", "robinhood"];
 
 export function fallbackExtract(text: string): Extraction {
@@ -36,8 +38,13 @@ export function fallbackExtract(text: string): Extraction {
       const percent = move[3].toLowerCase() === "x" ? (n - 1) * 100 : n;
       claims.push(claimDefaults({ quote, kind: "price_change", coin, direction: down ? "down" : "up", percent, period: periodOf(quote) }));
     }
+    const sector = quote.match(new RegExp(`(#1|number one|top\\s+(\\d{1,3})|top|biggest|leading|best)\\s+(${SECTORS})\\s*(coins?|tokens?|projects?)?\\b`, "i"));
+    if (sector) {
+      const n = sector[2] ? Number(sector[2]) : /top$/i.test(sector[1]) ? null : 1;
+      claims.push(claimDefaults({ quote, kind: "category_rank", coin, category: sector[3], rankLimit: n }));
+    }
     const top = quote.match(/\btop\s+(\d{1,4})\b/i);
-    if (top) claims.push(claimDefaults({ quote, kind: "rank", coin, rankLimit: Number(top[1]) }));
+    if (top && !sector) claims.push(claimDefaults({ quote, kind: "rank", coin, rankLimit: Number(top[1]) }));
     if (/\b(low|micro|small)[\s-]?cap\b/i.test(quote)) {
       claims.push(claimDefaults({ quote, kind: "market_cap", coin, comparator: "below" }));
     }

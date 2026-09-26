@@ -10,9 +10,9 @@ export function ClaimList({ claims }: { claims: ClaimResult[] }) {
     <ul className="space-y-3">
       {claims.map((c) => (
         <li key={c.id} className="rounded-md border border-rule bg-white/40 p-3">
-          <div className="flex items-start gap-3">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:gap-3">
             <VerdictBadge verdict={c.verdict} />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 self-stretch">
               <p className="text-sm italic text-muted">“{c.quote}”</p>
               <p className="mt-1 font-medium">{c.summary}</p>
               {c.evidence.length > 0 && (

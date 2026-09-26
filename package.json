@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "probe": "bun scripts/probe.ts",
-    "base-rates": "bun scripts/base-rates.ts"
+    "base-rates": "bun scripts/base-rates.ts",
+    "warm-cache": "bun scripts/warm-cache.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

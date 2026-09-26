@@ -13,6 +13,7 @@ export const CLAIM_KINDS = [
   "new_listing", // "just launched", "brand new"
   "fixed_supply", // "fixed supply", "capped supply"
   "trending", // "trending on CMC"
+  "category_rank", // "#1 AI coin", "top 10 meme coin"
   "market_wide", // "whole market is pumping"
   "unverifiable", // team doxxed, audit, partnerships, whales buying
   "opinion", // "next 100x", "undervalued", price predictions
@@ -31,6 +32,7 @@ export const Claim = z.object({
   usdValue: z.number().nullable().describe("Dollar amount in the claim, e.g. 5000000 for '$5M'"),
   comparator: z.enum(["above", "below", "about"]).nullable(),
   exchange: z.string().nullable().describe("Exchange name for listing claims"),
+  category: z.string().nullable().describe("Sector for category_rank claims, e.g. 'AI', 'meme', 'Layer 1', 'DeFi'"),
   reason: z.string().nullable().describe("For unverifiable/opinion: why market data can't check it"),
 });
 export type Claim = z.infer<typeof Claim>;
@@ -59,6 +61,7 @@ export function claimDefaults(partial: Partial<Claim> & Pick<Claim, "quote" | "k
     usdValue: null,
     comparator: null,
     exchange: null,
+    category: null,
     reason: null,
     ...partial,
   };

@@ -16,13 +16,15 @@ Only list an exchange's own token if the post names the token itself ($BNB, "BNB
 claims: each separate statement about a coin or the market. Pick the closest kind:
 - price_change: price went up/down by some amount over a period ("up 300% this week", "10x today"; 10x = 900 percent)
 - price_level: the price is above/below/about a dollar value
-- rank: "top N" or "#N on CMC"
+- rank: "top N" or "#N on CMC" overall (for "top N in a sector" use category_rank)
 - market_cap: market cap size, including "low cap", "micro cap" (comparator below, usdValue null if no number)
 - volume_spike: trading volume is exploding / surging / up
 - listed_on_exchange: listed or trading on a named exchange
 - new_listing: just launched, brand new, just listed
 - fixed_supply: fixed, capped or limited supply
 - trending: trending on CMC / everywhere
+- category_rank: the coin's place inside a sector ("#1 AI coin", "top 10 meme coin", "biggest DeFi token").
+  Put the sector in category and N in rankLimit ("#1", "the biggest", "leading" = 1; no number = null)
 - market_wide: claims about the whole crypto market
 - unverifiable: facts that market data can't show (team doxxed, audited, partnerships, whales buying, burns, insiders). Put why in reason.
 - opinion: predictions and hype ("next 100x", "going to $1", "undervalued", "don't fade this"). Put why in reason.
@@ -35,7 +37,11 @@ Post:
 """`;
 
 // Bump when the prompt or schema changes, so old cached extractions are not reused.
-const PROMPT_VERSION = 2;
+const PROMPT_VERSION = 3;
+
+// Gemini usually answers in ~3s but sometimes stalls for close to a minute.
+// Past this, the rule-based extractor answers instead.
+const LLM_TIMEOUT_MS = 12_000;
 
 export interface ExtractResult {
   extraction: Extraction;
@@ -56,7 +62,7 @@ export async function extractClaims(text: string): Promise<ExtractResult> {
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: LLM_TIMEOUT_MS } });
     const res = await ai.models.generateContent({
       model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
       contents: PROMPT.replace("{TEXT}", text.slice(0, 4000)),

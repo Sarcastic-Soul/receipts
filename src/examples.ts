@@ -1,11 +1,20 @@
 // One-click examples so a visitor sees a full verdict without hunting for a post.
-// Written in the style of common shill posts; checked live against CMC.
+// Mostly written in the style of common shill posts, plus one real post from X.
+// All checked live against CMC.
 
 export const EXAMPLES: Array<{ label: string; input: string }> = [
   {
     label: "Meme coin shill",
     input:
       "$PEPE is up 300% this week and still a low cap gem 💎 Volume exploding, listed on Binance. Next 100x, don't fade this 🚀",
+  },
+  {
+    label: "Real post on X",
+    input: "https://x.com/arkham/status/1654455708157452290",
+  },
+  {
+    label: "Sector claim",
+    input: "$WIF is a top 10 meme coin and the #1 dog coin. Already on Binance, up 50% this week 🚀",
   },
   {
     label: "\"Top 3 coin\" claim",

@@ -2,6 +2,10 @@ import { randomBytes } from "node:crypto";
 import { buildCard } from "./card.js";
 import { CmcSession, type CmcResult } from "./cmc/client.js";
 import {
+  categories,
+  categoryCoins,
+  exchangeAssets,
+  exchangeMap,
   globalMetrics,
   infoByAddress,
   infoByIds,
@@ -10,12 +14,17 @@ import {
   marketPairs,
   quotesByIds,
   trendingLatest,
+  type Category,
+  type CategoryDetail,
+  type Exchange,
+  type ExchangeHolding,
   type MapEntry,
   type MarketPairs,
 } from "./cmc/endpoints.js";
-import { checkClaim, type CheckContext, type CoinData } from "./claims/checkers.js";
+import { checkClaim, type CategoryLookup, type CheckContext, type CoinData, type ExchangeLookup } from "./claims/checkers.js";
+import { matchCategory, matchExchange, normalize } from "./claims/lookup.js";
 import { extractClaims } from "./claims/extract.js";
-import type { Extraction, Mention } from "./claims/schema.js";
+import type { Claim, Extraction, Mention } from "./claims/schema.js";
 import { classifyInput, findAddresses, findCashtags, findTweetUrl } from "./detect.js";
 import { fetchTweet, type Tweet } from "./tweet.js";
 import type { CheckResult, CoinCard } from "./types.js";
@@ -95,7 +104,7 @@ export async function runCheck(raw: string, deps: CheckDeps = {}): Promise<Check
 
   if (quotes && !quotes.ok) notes.push(`Live quotes failed: ${quotes.errorMessage ?? "unknown error"}.`);
   if (pairs.some((p) => p.needsPlan) && extraction.claims.some((c) => c.kind === "listed_on_exchange")) {
-    notes.push("Market pairs (exchange listings) aren't on the current CMC API plan, so exchange checks are skipped.");
+    notes.push("Market pairs (exchange listings) aren't on our CMC API plan, so exchange claims are checked against the exchange's wallet holdings on CMC instead.");
   }
 
   const cards: CoinCard[] = [];
@@ -130,6 +139,19 @@ export async function runCheck(raw: string, deps: CheckDeps = {}): Promise<Check
     if (data && !data.pairs) data.pairs = await marketPairs(cmc, data.card.id);
   }
 
+  // Exchange claims without market pairs fall back to the exchange's wallet holdings.
+  const needReserves = extraction.claims.filter((c) => {
+    if (c.kind !== "listed_on_exchange" || !c.exchange) return false;
+    const data = c.coin ? ctx.coins.get(c.coin.toUpperCase()) : ctx.primary;
+    return !!data && !data.pairs?.ok;
+  });
+  ctx.exchanges = await lookUpExchanges(cmc, needReserves, ctx);
+  ctx.categories = await lookUpCategories(
+    cmc,
+    extraction.claims.filter((c) => c.kind === "category_rank" && c.category),
+    ctx,
+  );
+
   // 5. Check every claim.
   const claims = extraction.claims.map((claim, i) => checkClaim(claim, ctx, `c${i + 1}`));
 
@@ -158,6 +180,69 @@ export async function runCheck(raw: string, deps: CheckDeps = {}): Promise<Check
     extractor,
     notes,
   };
+}
+
+function claimCoinIds(claims: Claim[], ctx: CheckContext): Set<number> {
+  const ids = new Set<number>();
+  for (const c of claims) {
+    const data = c.coin ? ctx.coins.get(c.coin.toUpperCase()) : ctx.primary;
+    if (data) ids.add(data.card.id);
+  }
+  return ids;
+}
+
+async function lookUpExchanges(cmc: CmcSession, claims: Claim[], ctx: CheckContext): Promise<Map<string, ExchangeLookup>> {
+  const out = new Map<string, ExchangeLookup>();
+  if (!claims.length) return out;
+  const names = [...new Set(claims.map((c) => c.exchange!))];
+  const coinIds = claimCoinIds(claims, ctx);
+  // Receipts show only the exchanges we matched, not all ~1000.
+  const map = await exchangeMap(cmc, (data) => {
+    const list = data as Exchange[];
+    return { exchanges_on_cmc: list.length, matched: names.map((n) => matchExchange(n, list)).filter(Boolean) };
+  });
+  const assetsById = new Map<number, Awaited<ReturnType<typeof exchangeAssets>>>();
+  for (const name of names) {
+    const exchange = map.data ? matchExchange(name, map.data) : null;
+    if (exchange && !assetsById.has(exchange.id)) {
+      assetsById.set(
+        exchange.id,
+        await exchangeAssets(cmc, exchange.id, (data) => {
+          const rows = data as ExchangeHolding[];
+          return { coins_held: rows.length, largest: rows.slice(0, 3), claimed_coins: rows.filter((r) => coinIds.has(r.crypto_id)) };
+        }),
+      );
+    }
+    out.set(normalize(name), { map, exchange, assets: exchange ? assetsById.get(exchange.id) : undefined });
+  }
+  return out;
+}
+
+async function lookUpCategories(cmc: CmcSession, claims: Claim[], ctx: CheckContext): Promise<Map<string, CategoryLookup>> {
+  const out = new Map<string, CategoryLookup>();
+  if (!claims.length) return out;
+  const names = [...new Set(claims.map((c) => c.category!))];
+  const coinIds = claimCoinIds(claims, ctx);
+  const list = await categories(cmc, (data) => {
+    const cats = data as Category[];
+    return { categories_on_cmc: cats.length, matched: names.map((n) => matchCategory(n, cats)).filter(Boolean) };
+  });
+  const detailById = new Map<string, Awaited<ReturnType<typeof categoryCoins>>>();
+  for (const name of names) {
+    const category = list.data ? matchCategory(name, list.data) : null;
+    if (category && !detailById.has(category.id)) {
+      detailById.set(
+        category.id,
+        await categoryCoins(cmc, category.id, (data) => {
+          const d = data as CategoryDetail;
+          const coins = d.coins.map((c, i) => ({ position: i + 1, ...c }));
+          return { ...d, coins: coins.filter((c) => c.position <= 5 || coinIds.has(c.id)) };
+        }),
+      );
+    }
+    out.set(normalize(name), { list, category, detail: category ? detailById.get(category.id) : undefined });
+  }
+  return out;
 }
 
 interface Resolved {

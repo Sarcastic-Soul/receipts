@@ -57,11 +57,32 @@ describe("runCheck end to end (fake CMC)", () => {
     expect(r.unresolved).toContain("NOTACOIN");
   });
 
-  it("marks exchange claims as needs_plan when market pairs are blocked", async () => {
+  it("checks exchange claims against the exchange's wallets when market pairs are blocked", async () => {
     const { fetch } = fakeCmcFetch({ pairsForbidden: true });
+    const r = await runCheck("$PEPE listed on Binance. $PEPE listed on Kraken.", { cmc: new CmcSession("k", fetch), extract, now: NOW });
+    const [binance, kraken] = r.claims.filter((c) => c.kind === "listed_on_exchange");
+    expect(binance.verdict).toBe("true");
+    expect(binance.summary).toContain("4.00T"); // two wallets summed
+    expect(kraken.verdict).toBe("unverifiable");
+    expect(r.notes.join(" ")).toContain("wallet holdings");
+    const receipt = r.receipts.find((x) => x.endpoint === "/v1/exchange/assets");
+    expect(JSON.stringify(receipt?.response)).toContain("claimed_coins");
+  });
+
+  it("marks exchange claims as needs_plan when pairs and wallets are both blocked", async () => {
+    const { fetch } = fakeCmcFetch({ pairsForbidden: true, assetsForbidden: true });
     const r = await runCheck("$PEPE listed on Binance", { cmc: new CmcSession("k", fetch), extract, now: NOW });
     expect(r.claims.find((c) => c.kind === "listed_on_exchange")?.verdict).toBe("needs_plan");
-    expect(r.notes.join(" ")).toContain("Market pairs");
+  });
+
+  it("checks a coin's place in its CMC category", async () => {
+    const { fetch } = fakeCmcFetch();
+    const r = await runCheck("$PEPE is the #1 meme coin. $PEPE top 5 meme token.", { cmc: new CmcSession("k", fetch), extract, now: NOW });
+    const [first, top5] = r.claims.filter((c) => c.kind === "category_rank");
+    expect(first).toMatchObject({ verdict: "false" });
+    expect(first.summary).toContain("#3");
+    expect(first.summary).toContain("#1 is $DOGE");
+    expect(top5.verdict).toBe("true");
   });
 
   it("gets tweet text through the tweet fetcher", async () => {

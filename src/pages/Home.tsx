@@ -120,7 +120,7 @@ function HowItWorks() {
   const steps = [
     ["Read", "Tweet links are read with X's public oEmbed. Text, tickers and addresses work directly."],
     ["Extract", "An LLM lists the coins and every checkable claim in the post. It never produces numbers."],
-    ["Check", "Plain code checks each claim against CoinMarketCap: quotes, ranks, volume, market pairs, supply."],
+    ["Check", "Plain code checks each claim against CoinMarketCap: quotes, ranks, volume, supply, sector rankings and exchange wallets."],
     ["Receipts", "Every verdict links to the exact CMC request and response it came from."],
   ];
   return (
