@@ -19,8 +19,8 @@ export function ReceiptsPanel({ receipts, highlight }: { receipts: Receipt[]; hi
         >
           <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-3 py-2">
             <span className="rounded bg-ink px-1.5 text-paper">{r.id}</span>
-            <span className="font-semibold">GET {r.endpoint}</span>
-            <span className="text-muted">{new URLSearchParams(r.params).toString()}</span>
+            <span className="break-all font-semibold">GET {r.endpoint}</span>
+            <span className="min-w-0 break-all text-muted">{new URLSearchParams(r.params).toString()}</span>
             <span className={`ml-auto ${r.ok ? "text-good" : "text-bad"}`}>
               {r.ok ? "200 OK" : `${r.status || "ERR"}${r.errorCode ? ` · error ${r.errorCode}` : ""}`}
             </span>

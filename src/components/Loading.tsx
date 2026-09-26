@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 
-const STEPS = ["Reading the post", "Pulling out claims", "Finding coins on CoinMarketCap", "Checking every claim", "Printing receipts"];
+const STEPS = [
+  ["📥", "Reading the post"],
+  ["🧠", "Pulling out claims"],
+  ["🔎", "Finding coins on CoinMarketCap"],
+  ["⚖️", "Checking every claim"],
+  ["🧾", "Printing receipts"],
+] as const;
 
 export function Loading() {
   const [step, setStep] = useState(0);
@@ -9,10 +15,16 @@ export function Loading() {
     return () => clearInterval(t);
   }, []);
   return (
-    <ol className="mt-8 space-y-1 rounded-md bg-paper p-4 font-mono text-sm" aria-live="polite">
-      {STEPS.map((s, i) => (
-        <li key={s} className={i <= step ? "text-ink" : "text-muted/50"}>
-          {i < step ? "✓" : i === step ? "›" : " "} {s}
+    <ol className="mt-8 space-y-2 rounded-md border-2 border-dashed border-rule bg-paper p-4 font-mono text-sm sm:p-5" aria-live="polite">
+      {STEPS.map(([emoji, s], i) => (
+        <li
+          key={s}
+          className={`flex items-center gap-2 transition-opacity duration-300 ${i < step ? "text-muted" : i === step ? "font-semibold text-ink" : "opacity-30"}`}
+        >
+          <span className="w-5 text-center" aria-hidden>
+            {i < step ? "✅" : emoji}
+          </span>
+          {s}
           {i === step && <span className="animate-pulse">…</span>}
         </li>
       ))}

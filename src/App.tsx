@@ -11,7 +11,7 @@ export default function App() {
   const match = path.match(/^\/r\/([A-Za-z0-9]+)/);
 
   return (
-    <div className="min-h-screen px-4 py-8 sm:py-12">
+    <div className="min-h-screen px-4 py-6 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-3xl">
         <Header />
         {match ? (
@@ -27,9 +27,9 @@ export default function App() {
 
 function Header() {
   return (
-    <header className="mb-8 flex items-baseline justify-between gap-4">
+    <header className="mb-8 flex flex-col gap-0.5 border-b-2 border-ink pb-3 sm:mb-10 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
       <a href="/" className="font-mono text-2xl font-semibold tracking-tight">
-        RECEIPTS<span className="text-bad">.</span>
+        🧾 RECEIPTS<span className="text-bad">.</span>
       </a>
       <span className="font-mono text-xs text-muted">crypto posts, fact-checked with CoinMarketCap</span>
     </header>
@@ -38,7 +38,7 @@ function Header() {
 
 function Footer() {
   return (
-    <footer className="mt-12 space-y-2 text-center font-mono text-xs text-muted">
+    <footer className="mt-14 space-y-2 border-t border-dashed border-rule pt-6 text-center font-mono text-xs leading-relaxed text-muted">
       <p>Checks facts, not whether to buy. Not financial advice.</p>
       <p>
         Market data from the{" "}

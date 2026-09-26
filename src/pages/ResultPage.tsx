@@ -1,3 +1,4 @@
+import { ArrowLeft, Check, ChevronDown, Copy, ExternalLink, Info, Share2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { pct, usd } from "../../lib/format";
 import type { CheckResult, Verdict } from "../../lib/types";
@@ -33,48 +34,52 @@ export function ResultPage({ id, initial }: { id: string; initial: CheckResult |
     return (
       <div className="rounded-md bg-paper p-6">
         <p className="mb-3 text-bad">{error}</p>
-        <a href="/" className="font-mono text-sm underline">
-          ← Check something else
+        <a href="/" className="inline-flex items-center gap-1 font-mono text-sm underline">
+          <ArrowLeft size={14} /> Check something else
         </a>
       </div>
     );
   }
-  if (!result) return <p className="font-mono text-sm text-muted">Loading receipt…</p>;
+  if (!result) return <p className="animate-pulse font-mono text-sm text-muted">🧾 Loading receipt…</p>;
 
   return (
     <ReceiptsContext.Provider value={{ open }}>
       <main className="space-y-6">
-        <a href="/" className="font-mono text-sm underline">
-          ← Check another post
+        <a href="/" className="inline-flex items-center gap-1 font-mono text-sm text-muted hover:text-ink">
+          <ArrowLeft size={14} /> Check another post
         </a>
 
-        <section>
+        <section className="print-in">
           <div className="receipt-edge-top" />
-          <div className="bg-paper px-5 py-5 sm:px-7">
+          <div className="bg-paper px-4 py-5 sm:px-8 sm:py-7">
             <SourcePost result={result} />
             <div className="my-5 dashed-rule" />
             <Tally result={result} />
-            <div className="mt-4">
+            <div className="mt-5">
               <ClaimList claims={result.claims} />
             </div>
             {result.market && (
-              <p className="mt-4 font-mono text-xs text-muted">
-                Whole crypto market: {usd(result.market.totalMarketCap)} total cap,{" "}
+              <p className="mt-5 font-mono text-xs text-muted">
+                🌍 Whole crypto market: {usd(result.market.totalMarketCap)} total cap,{" "}
                 {pct(result.market.totalMarketCapChange24h)} vs yesterday.
                 <ReceiptChip id={result.market.receiptId} />
               </p>
             )}
             {result.unresolved.length > 0 && (
-              <p className="mt-3 rounded border-l-4 border-bad bg-white/40 px-2 py-1 text-sm">
-                Not found on CoinMarketCap: {result.unresolved.map((u) => (u.length > 14 ? `${u.slice(0, 6)}…${u.slice(-4)}` : `$${u}`)).join(", ")}.
+              <p className="mt-3 rounded-md border-l-4 border-bad bg-white/50 px-3 py-2 text-sm">
+                🚫 Not found on CoinMarketCap: {result.unresolved.map((u) => (u.length > 14 ? `${u.slice(0, 6)}…${u.slice(-4)}` : `$${u}`)).join(", ")}.
                 A coin CMC doesn't track has no public market data to back up any claim.
               </p>
             )}
-            {result.notes.map((n) => (
-              <p key={n} className="mt-2 font-mono text-xs text-muted">
-                Note: {n}
-              </p>
-            ))}
+            {result.notes.length > 0 && (
+              <div className="mt-4 space-y-1.5 rounded-md border border-rule bg-white/40 px-3 py-2 text-xs text-muted">
+                {result.notes.map((n) => (
+                  <p key={n} className="flex gap-2">
+                    <Info size={14} className="mt-px shrink-0" /> <span>{n}</span>
+                  </p>
+                ))}
+              </div>
+            )}
             <div className="my-5 dashed-rule" />
             <Share result={result} />
           </div>
@@ -82,16 +87,20 @@ export function ResultPage({ id, initial }: { id: string; initial: CheckResult |
         </section>
 
         <section className="space-y-4">
-          <h2 className="font-mono text-xs uppercase tracking-widest text-muted">Coin{result.coins.length === 1 ? "" : "s"}</h2>
+          <h2 className="font-mono text-xs uppercase tracking-widest text-muted">🪙 Coin{result.coins.length === 1 ? "" : "s"}</h2>
           {result.coins.map((c) => (
             <CoinCardView key={c.id} card={c} />
           ))}
         </section>
 
-        <section className="rounded-md bg-paper p-4">
-          <button onClick={() => setShowReceipts((s) => !s)} className="flex w-full items-center justify-between font-mono text-sm font-semibold">
+        <section className="rounded-md bg-paper p-4 sm:p-5">
+          <button
+            onClick={() => setShowReceipts((s) => !s)}
+            aria-expanded={showReceipts}
+            className="flex w-full items-center justify-between gap-3 text-left font-mono text-sm font-semibold"
+          >
             <span>🧾 Receipts: the CMC API calls behind every number</span>
-            <span>{showReceipts ? "Hide" : "Show"}</span>
+            <ChevronDown size={18} className={`shrink-0 transition-transform ${showReceipts ? "rotate-180" : ""}`} />
           </button>
           {showReceipts && (
             <div className="mt-4">
@@ -108,11 +117,11 @@ function SourcePost({ result }: { result: CheckResult }) {
   const { input } = result;
   return (
     <div>
-      <p className="mb-2 font-mono text-xs uppercase tracking-widest text-muted">
-        {input.kind === "tweet" ? "Post on X" : input.kind === "text" ? "Post" : input.kind === "ticker" ? "Ticker" : "Contract address"} ·
+      <p className="mb-3 font-mono text-[11px] uppercase tracking-widest text-muted">
+        {input.kind === "tweet" ? "𝕏 Post on X" : input.kind === "text" ? "Post" : input.kind === "ticker" ? "Ticker" : "Contract address"} ·
         checked {new Date(result.createdAt).toUTCString().replace(" GMT", " UTC")}
       </p>
-      <blockquote className="whitespace-pre-wrap break-words text-lg leading-snug">{input.text}</blockquote>
+      <blockquote className="whitespace-pre-wrap break-words border-l-2 border-ink/20 pl-3 text-base leading-snug sm:text-lg">{input.text}</blockquote>
       {input.tweet && (
         <p className="mt-2 font-mono text-xs text-muted">
           by{" "}
@@ -120,8 +129,8 @@ function SourcePost({ result }: { result: CheckResult }) {
             {input.tweet.author}
           </a>{" "}
           ·{" "}
-          <a href={input.tweet.url} target="_blank" rel="noreferrer" className="underline">
-            original post ↗
+          <a href={input.tweet.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 underline">
+            original post <ExternalLink size={11} />
           </a>
         </p>
       )}
@@ -134,9 +143,10 @@ function Tally({ result }: { result: CheckResult }) {
   for (const c of result.claims) counts.set(c.verdict, (counts.get(c.verdict) ?? 0) + 1);
   const checkable = result.claims.filter((c) => c.verdict !== "unverifiable" && c.verdict !== "needs_plan").length;
   const held = counts.get("true") ?? 0;
+  const shown = (Object.keys(VERDICT_STYLE) as Verdict[]).filter((v) => counts.get(v));
   return (
     <div>
-      <p className="text-2xl font-bold">
+      <p className="text-xl font-bold leading-tight sm:text-2xl">
         {result.claims.length === 0
           ? "Live data below."
           : checkable === 0
@@ -144,15 +154,20 @@ function Tally({ result }: { result: CheckResult }) {
             : `${held} of ${checkable} checkable claim${checkable === 1 ? "" : "s"} hold up.`}
       </p>
       {result.claims.length > 0 && (
-        <p className="mt-1 flex flex-wrap gap-2 font-mono text-xs">
-          {(Object.keys(VERDICT_STYLE) as Verdict[])
-            .filter((v) => counts.get(v))
-            .map((v) => (
-              <span key={v} className={`rounded px-1.5 ${VERDICT_STYLE[v].className}`}>
-                {counts.get(v)} {VERDICT_STYLE[v].label.toLowerCase()}
+        <>
+          <div className="grow-x mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+            {shown.map((v) => (
+              <div key={v} style={{ flexGrow: counts.get(v) }} className={VERDICT_STYLE[v].className} />
+            ))}
+          </div>
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-xs">
+            {shown.map((v) => (
+              <span key={v} className="whitespace-nowrap">
+                {VERDICT_STYLE[v].emoji} {counts.get(v)} {VERDICT_STYLE[v].label.toLowerCase()}
               </span>
             ))}
-        </p>
+          </p>
+        </>
       )}
     </div>
   );
@@ -174,22 +189,31 @@ function Share({ result }: { result: CheckResult }) {
   if (tweetId) intent.searchParams.set("in_reply_to", tweetId);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 font-mono text-sm">
-      <button
-        onClick={() => {
-          void navigator.clipboard.writeText(url).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          });
-        }}
-        className="rounded-md border-2 border-ink px-3 py-1.5 font-semibold hover:bg-ink hover:text-paper"
-      >
-        {copied ? "Copied ✓" : "Copy link"}
-      </button>
-      <a href={intent.toString()} target="_blank" rel="noreferrer" className="rounded-md bg-ink px-3 py-1.5 font-semibold text-paper">
-        {tweetId ? "Reply to the post on X" : "Share on X"}
-      </a>
-      <span className="text-xs text-muted">Facts only. Not financial advice.</span>
+    <div className="font-mono text-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <button
+          onClick={() => {
+            void navigator.clipboard.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            });
+          }}
+          className="inline-flex items-center justify-center gap-2 rounded-md border-2 border-ink px-4 py-2 font-semibold transition-colors hover:bg-ink hover:text-paper"
+        >
+          {copied ? <Check size={16} /> : <Copy size={16} />}
+          {copied ? "Copied" : "Copy link"}
+        </button>
+        <a
+          href={intent.toString()}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center justify-center gap-2 rounded-md border-2 border-ink bg-ink px-4 py-2 font-semibold text-paper transition-transform hover:-translate-y-0.5"
+        >
+          <Share2 size={16} />
+          {tweetId ? "Reply to the post on X" : "Share on X"}
+        </a>
+      </div>
+      <p className="mt-3 text-xs text-muted">Facts only. Not financial advice.</p>
     </div>
   );
 }
